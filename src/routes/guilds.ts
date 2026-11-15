@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { botToken, clientId } from "../config";
+import { botToken, clientId, redirectUri } from "../config";
 import { demoChannelsFor, demoGuilds, demoRoles } from "../demo";
 import { discordJson, guildsWithBotStatus, validAccessToken } from "../discord";
 import { apiError } from "../http";
@@ -47,16 +47,22 @@ export const guildRoutes = new Elysia({ name: "guilds" })
       return apiError("Could not load this server.", 502);
     }
   })
-  .get("/api/guilds/:id/invite", ({ params, headers }) => {
+  .get("/api/guilds/:id/invite", ({ params, headers, set }) => {
+    set.headers["Cache-Control"] = "no-store";
     const session = getSession(headers.cookie);
     if (!session) return apiError("Not signed in.", 401);
     const isDemo = session.demo && demoGuilds.some((guild) => guild.id === params.id);
     const isMember = session.guilds?.some((guild) => guild.id === params.id && hasAdministratorPermission(guild));
     if (!isDemo && !isMember) return apiError("Server not found.", 404);
     if (!clientId || session.demo) return { url: null };
+    const state = crypto.randomUUID();
+    session.botInvite = { state, issuedAt: Date.now() };
     const invite = new URL("https://discord.com/oauth2/authorize");
     invite.search = new URLSearchParams({
       client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      state,
       scope: "bot applications.commands",
       permissions: "1024",
       guild_id: params.id,

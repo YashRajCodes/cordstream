@@ -1,7 +1,23 @@
-import { botToken, clientId, clientSecret, discordApi } from "./config";
+import { botToken, clientId, clientSecret, discordApi, redirectUri } from "./config";
 import { demoGuilds } from "./demo";
 import { hasAdministratorPermission } from "./permissions";
 import type { Guild, Session } from "./types";
+
+export async function exchangeOAuthCode(code: string) {
+  const response = await fetch(`${discordApi}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId!,
+      client_secret: clientSecret!,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+  if (!response.ok) throw new Error("OAuth token exchange failed");
+  return response.json() as Promise<{ access_token: string; refresh_token?: string; expires_in: number }>;
+}
 
 export async function discordJson<T>(path: string, token: string, kind: "Bot" | "Bearer" = "Bot"): Promise<T> {
   const response = await fetch(`${discordApi}${path}`, {
@@ -36,11 +52,11 @@ export async function validAccessToken(session: Session) {
   }
 }
 
-export async function guildsWithBotStatus(session: Session): Promise<Guild[]> {
+export async function guildsWithBotStatus(session: Session, refresh = false): Promise<Guild[]> {
   if (session.demo) return demoGuilds;
   const guilds = (session.guilds ?? []).filter(hasAdministratorPermission);
   const cached = session.botStatus;
-  if (cached && Date.now() - (session.botStatusCheckedAt ?? 0) < 60_000) {
+  if (!refresh && cached && Date.now() - (session.botStatusCheckedAt ?? 0) < 60_000) {
     return guilds.map((guild) => ({ ...guild, botAdded: cached.get(guild.id) ?? false }));
   }
 

@@ -1,7 +1,7 @@
-import { handleAction } from "./js/actions.js";
+import { handleAction, selectGuild } from "./js/actions.js";
 import { renderLogin, renderShell } from "./js/render.js";
-import { state } from "./js/state.js";
-import { app } from "./js/ui.js";
+import { selectedGuild, state } from "./js/state.js";
+import { app, showToast } from "./js/ui.js";
 
 app.addEventListener("click", (event) => {
   const element = event.target.closest("[data-action]");
@@ -11,22 +11,66 @@ app.addEventListener("click", (event) => {
   void handleAction(action, element.dataset.id, element);
 });
 
-async function start() {
+let refreshPromise;
+
+async function refreshSession() {
   try {
-    const response = await fetch("/api/auth/status");
+    const response = await fetch("/api/auth/status", { cache: "no-store" });
+    if (response.status === 401) {
+      state.user = null;
+      state.guilds = [];
+      state.selectedGuildId = null;
+      state.selectedChannelId = null;
+      renderLogin("Discord login expired. Sign in again.");
+      return;
+    }
+    if (!response.ok) throw new Error("Server refresh failed");
     const data = await response.json();
     if (!data.authenticated) {
+      state.user = null;
+      state.guilds = [];
+      state.selectedGuildId = null;
+      state.selectedChannelId = null;
       const error = new URLSearchParams(window.location.search).get("auth_error");
       renderLogin(error ? "Discord login failed. Try again." : "");
       return;
     }
+    const previousGuild = selectedGuild();
     state.user = data.user;
     state.guilds = data.guilds ?? [];
     state.demo = Boolean(data.demo);
+    const guild = selectedGuild();
+    if (previousGuild && !guild) {
+      state.selectedGuildId = null;
+      state.selectedChannelId = null;
+      state.channels = [];
+      state.roles = [];
+      state.mobileView = "servers";
+    } else if (guild && guild.botAdded !== previousGuild?.botAdded) {
+      await selectGuild(guild.id);
+    }
     renderShell();
+    if (new URLSearchParams(window.location.search).has("invite_error")) {
+      showToast("Bot authorization was not completed. Try again.");
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   } catch {
-    renderLogin("Could not connect. Try again.");
+    if (state.user) showToast("Could not refresh your servers. Try again.");
+    else renderLogin("Could not connect. Try again.");
   }
 }
+
+function start() {
+  if (!refreshPromise) refreshPromise = refreshSession().finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
+window.addEventListener("focus", () => { void start(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void start();
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) void start();
+});
 
 void start();

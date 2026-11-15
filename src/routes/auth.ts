@@ -1,20 +1,30 @@
 import { Elysia } from "elysia";
-import { appUrl, clientId, clientSecret, discordApi, oauthLifetime, production, redirectUri, sessionLifetime } from "../config";
-import { discordJson, guildsWithBotStatus } from "../discord";
+import { appUrl, clientId, clientSecret, oauthLifetime, production, redirectUri, sessionLifetime } from "../config";
+import { discordJson, exchangeOAuthCode, guildsWithBotStatus, validAccessToken } from "../discord";
 import { apiError, redirect } from "../http";
 import { cookieValue, expiredSessionCookie, getSession, oauthStates, sessionCookie, sessions } from "../session";
 import type { DiscordGuild, Session } from "../types";
 
 export const authRoutes = new Elysia({ name: "auth" })
-  .get("/api/auth/status", async ({ headers }) => {
+  .get("/api/auth/status", async ({ headers, set }) => {
+    set.headers["Cache-Control"] = "no-store";
     const session = getSession(headers.cookie);
     if (!session) return { authenticated: false, demoAvailable: !production };
-    return {
-      authenticated: true,
-      demo: Boolean(session.demo),
-      user: session.user,
-      guilds: await guildsWithBotStatus(session),
-    };
+    try {
+      if (!session.demo) {
+        const token = await validAccessToken(session);
+        if (!token) return apiError("Discord login expired. Sign in again.", 401);
+        session.guilds = await discordJson<DiscordGuild[]>("/users/@me/guilds", token, "Bearer");
+      }
+      return {
+        authenticated: true,
+        demo: Boolean(session.demo),
+        user: session.user,
+        guilds: await guildsWithBotStatus(session, true),
+      };
+    } catch {
+      return apiError("Could not refresh your servers. Try again.", 502);
+    }
   })
   .get("/api/auth/login", ({ headers }) => {
     if (!clientId || !clientSecret) {
@@ -45,6 +55,22 @@ export const authRoutes = new Elysia({ name: "auth" })
   })
   .get("/api/auth/callback", async ({ query, headers }) => {
     const state = typeof query.state === "string" ? query.state : "";
+    const session = getSession(headers.cookie);
+    const invite = session?.botInvite;
+    if (session && invite && state === invite.state) {
+      delete session.botInvite;
+      if (!query.code || query.error || Date.now() - invite.issuedAt > oauthLifetime) {
+        return redirect(`${appUrl}/?invite_error=authorization`);
+      }
+      try {
+        await exchangeOAuthCode(query.code);
+        delete session.botStatus;
+        delete session.botStatusCheckedAt;
+        return redirect(appUrl);
+      } catch {
+        return redirect(`${appUrl}/?invite_error=authorization`);
+      }
+    }
     const issuedAt = oauthStates.get(state);
     oauthStates.delete(state);
     const savedState = cookieValue(headers.cookie, "cordstream_oauth_state");
@@ -53,19 +79,7 @@ export const authRoutes = new Elysia({ name: "auth" })
     }
 
     try {
-      const tokenResponse = await fetch(`${discordApi}/oauth2/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId!,
-          client_secret: clientSecret!,
-          grant_type: "authorization_code",
-          code: query.code,
-          redirect_uri: redirectUri,
-        }),
-      });
-      if (!tokenResponse.ok) throw new Error("OAuth token exchange failed");
-      const token = await tokenResponse.json() as { access_token: string; refresh_token?: string; expires_in: number };
+      const token = await exchangeOAuthCode(query.code);
       const [user, guilds] = await Promise.all([
         discordJson<Session["user"]>("/users/@me", token.access_token, "Bearer"),
         discordJson<DiscordGuild[]>("/users/@me/guilds", token.access_token, "Bearer"),

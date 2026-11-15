@@ -3,7 +3,7 @@ import { selectedGuild, state } from "./state.js";
 import { readStreams, writeStreams } from "./streams.js";
 import { copyUrl, showToast } from "./ui.js";
 
-async function selectGuild(id) {
+export async function selectGuild(id) {
   state.selectedGuildId = id;
   state.selectedChannelId = null;
   state.channels = [];
@@ -23,10 +23,12 @@ async function selectGuild(id) {
     const response = await fetch(`/api/guilds/${encodeURIComponent(id)}/channels`);
     if (!response.ok) throw new Error("Channel request failed");
     const data = await response.json();
+    if (state.selectedGuildId !== id) return;
     state.channels = data.channels ?? [];
     state.roles = data.roles ?? [];
     for (const category of state.channels.filter((channel) => channel.type === 4)) state.openCategories.add(category.id);
   } catch {
+    if (state.selectedGuildId !== id) return;
     state.channelsError = true;
   }
   state.channelsLoading = false;

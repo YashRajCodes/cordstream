@@ -40,6 +40,35 @@ OAuth sessions expire after seven days and live in memory. Restarting cordstream
 
 SQLite only stores stream keys, their server/channel and creator IDs, and creation metadata. Messages and live event buffers stay in the running app. There is no Redis or persistent message cache.
 
+## Docker
+
+Copy `.env.example` to `.env` and set your Discord credentials, `APP_URL`, and `DISCORD_REDIRECT_URI`. The container runs in production mode, which requires Discord credentials and HTTPS for login cookies.
+
+```sh
+docker compose up -d --build
+```
+
+The default publishes `PORT` on all host interfaces. Set `BIND_ADDRESS=127.0.0.1` in `.env` for a reverse proxy running on the host. For a reverse proxy on the same Docker network, use Docker Compose 2.24.0 or newer:
+
+```sh
+docker compose -f compose.yaml -f compose.internal.yaml up -d --build
+```
+
+This publishes no host port. Attach your reverse proxy to the project's default network and forward requests to `cordstream:3001`, or the `PORT` you configured. Keep response buffering disabled for `/stream/`.
+
+Both modes use `restart: always` and keep stream links in the `cordstream-data` volume at `/app/data/cordstream.sqlite`. Compose sets this path regardless of `STREAM_DATABASE_PATH` in `.env`.
+
+The Docker image workflow publishes AMD64 and ARM64 images to `ghcr.io/yashrajcodes/cordstream` on pushes to `main` or `master`, `v*` tags, and manual runs. The `latest` tag follows the default branch. Pull requests build without publishing.
+
+To use a published image, set `CORDSTREAM_IMAGE=ghcr.io/yashrajcodes/cordstream:latest` in `.env`, then run:
+
+```sh
+docker compose pull
+docker compose up -d --no-build
+```
+
+Include `-f compose.yaml -f compose.internal.yaml` in both commands for the internal network mode.
+
 ## Stream links
 
 Select a channel and click **Create stream URL**. The Stream URLs section lists links in this form:

@@ -1,0 +1,18 @@
+services:
+  cordstream:
+    build: .
+    image: ${CORDSTREAM_IMAGE:-cordstream:local}
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3001}
+      STREAM_DATABASE_PATH: /app/data/cordstream.sqlite
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${PORT:-3001}:${PORT:-3001}"
+    volumes:
+      - cordstream-data:/app/data
+
+volumes:
+  cordstream-data:

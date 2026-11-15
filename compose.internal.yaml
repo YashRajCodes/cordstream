@@ -1,0 +1,5 @@
+services:
+  cordstream:
+    ports: !reset []
+    expose:
+      - "${PORT:-3001}"

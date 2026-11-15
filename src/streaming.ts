@@ -3,16 +3,97 @@ import { discordGateway, type DiscordGateway, type GatewayDispatch } from "./gat
 import { streamStore, type StoredStream } from "./stream-store";
 
 type RawMessage = Record<string, unknown>;
+export type StreamHistory = (channelId: string, signal: AbortSignal) => Promise<RawMessage[]>;
 type StreamGateway = Pick<DiscordGateway, "subscribe" | "subscribeStatus" | "waitUntilReady">;
+
+type SharedHistoryEntry = {
+  controller: AbortController;
+  promise: Promise<RawMessage[]>;
+  users: number;
+};
+
+function abortReason(signal: AbortSignal) {
+  return signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
+}
+
+function waitForAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    let finished = false;
+    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const onAbort = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(abortReason(signal));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then((value) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(value);
+    }, (error) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(error);
+    });
+    if (signal.aborted) onAbort();
+  });
+}
+
+/** Shares one in-flight history request for each Discord channel. */
+export class SharedChannelHistory {
+  private readonly entries = new WeakMap<StreamHistory, Map<string, SharedHistoryEntry>>();
+
+  load(channelId: string, history: StreamHistory, signal: AbortSignal): Promise<RawMessage[]> {
+    if (signal.aborted) return Promise.reject(abortReason(signal));
+    let channels = this.entries.get(history);
+    if (!channels) {
+      channels = new Map();
+      this.entries.set(history, channels);
+    }
+
+    let entry = channels.get(channelId);
+    if (!entry) {
+      const controller = new AbortController();
+      let created!: SharedHistoryEntry;
+      const promise = Promise.resolve()
+        .then(() => history(channelId, controller.signal))
+        .finally(() => {
+          if (channels!.get(channelId) === created) channels!.delete(channelId);
+        });
+      created = { controller, promise, users: 0 };
+      entry = created;
+      channels.set(channelId, entry);
+    }
+
+    entry.users++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      entry!.users--;
+      if (entry!.users !== 0) return;
+      if (channels!.get(channelId) === entry) channels!.delete(channelId);
+      entry!.controller.abort();
+    };
+    return waitForAbort(entry.promise, signal).finally(release);
+  }
+}
+
+export const sharedChannelHistory = new SharedChannelHistory();
 
 export type StreamDependencies = {
   gateway: StreamGateway;
-  history: (channelId: string, signal: AbortSignal) => Promise<RawMessage[]>;
+  history: StreamHistory;
   subscribeDeleted: (listener: (stream: StoredStream) => void) => () => void;
   heartbeatMs: number;
   maxBufferEvents: number;
   maxBufferBytes: number;
   maxQueueBytes: number;
+  historyCache?: SharedChannelHistory;
 };
 
 const encoder = new TextEncoder();
@@ -90,6 +171,7 @@ export function createStreamResponse(request: Request, stream: StoredStream, ove
     maxQueueBytes: 4 * 1024 * 1024,
     ...overrides,
   };
+  const historyCache = dependencies.historyCache ?? sharedChannelHistory;
   const abort = new AbortController();
   const cleanups: Array<() => void> = [];
   let controller: ReadableStreamDefaultController<Uint8Array>;
@@ -173,7 +255,7 @@ export function createStreamResponse(request: Request, stream: StoredStream, ove
       await dependencies.gateway.waitUntilReady();
       if (closed) return;
       stage = "history";
-      const messages = await dependencies.history(stream.channelId, abort.signal);
+      const messages = await historyCache.load(stream.channelId, dependencies.history, abort.signal);
       if (closed) return;
       // Discord's REST response is newest first. Leave each raw message untouched.
       if (!enqueue(encodeEvent("snapshot", {

@@ -1,8 +1,52 @@
-import { production, sessionLifetime } from "./config";
+import { oauthLifetime, production, sessionLifetime } from "./config";
 import type { Session } from "./types";
 
 export const sessions = new Map<string, Session>();
-export const oauthStates = new Map<string, number>();
+
+const maxOAuthStates = 10_000;
+
+/** OAuth state entries are short-lived and bounded even when callbacks never arrive. */
+class ExpiringOAuthStates extends Map<string, number> {
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  override set(state: string, issuedAt: number) {
+    this.delete(state);
+    super.set(state, issuedAt);
+    let timer!: ReturnType<typeof setTimeout>;
+    const delay = Math.max(0, issuedAt + oauthLifetime - Date.now());
+    timer = setTimeout(() => {
+      if (this.timers.get(state) !== timer) return;
+      this.timers.delete(state);
+      if (super.get(state) === issuedAt) super.delete(state);
+    }, delay);
+    timer.unref?.();
+    this.timers.set(state, timer);
+
+    while (this.size > maxOAuthStates) {
+      const oldest = this.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.delete(oldest);
+    }
+    return this;
+  }
+
+  override delete(state: string) {
+    const timer = this.timers.get(state);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.timers.delete(state);
+    }
+    return super.delete(state);
+  }
+
+  override clear() {
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
+    super.clear();
+  }
+}
+
+export const oauthStates = new ExpiringOAuthStates();
 
 export function cookieValue(cookieHeader: string | undefined, name: string) {
   const value = cookieHeader?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));

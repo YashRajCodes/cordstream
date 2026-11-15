@@ -123,6 +123,28 @@ describe("public Discord SSE", () => {
     expect(update).not.toHaveProperty("author");
   });
 
+  test("shares one in-flight history request between concurrent channel subscribers", async () => {
+    const fake = fakeDependencies();
+    const history = deferred<Record<string, unknown>[]>();
+    let historyCalls = 0;
+    let historySignal: AbortSignal | undefined;
+    fake.dependencies.history = async (_channelId, signal) => { historyCalls++; historySignal = signal; return history.promise; };
+    const firstAbort = new AbortController();
+    const first = connect(fake, stream, new Request("http://localhost", { signal: firstAbort.signal }));
+    const second = connect(fake);
+    await Bun.sleep(0);
+    await Bun.sleep(0);
+    expect(historyCalls).toBe(1);
+    firstAbort.abort();
+    expect(await first.events.next()).toBeUndefined();
+    expect(historySignal?.aborted).toBe(false);
+    history.resolve([]);
+    expect(await second.events.next()).toEqual({ event: "snapshot", data: { guild_id: "guild", channel_id: "channel", messages: [] } });
+    expect(historyCalls).toBe(1);
+    await second.events.reader.cancel();
+    expect(historySignal?.aborted).toBe(true);
+  });
+
   test.each([
     "MESSAGE_CREATE", "MESSAGE_UPDATE", "MESSAGE_DELETE", "MESSAGE_DELETE_BULK",
     "MESSAGE_REACTION_ADD", "MESSAGE_REACTION_REMOVE", "MESSAGE_REACTION_REMOVE_ALL", "MESSAGE_REACTION_REMOVE_EMOJI",

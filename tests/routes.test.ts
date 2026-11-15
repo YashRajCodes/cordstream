@@ -144,6 +144,13 @@ describe("authentication routes", () => {
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 
+  test("expires abandoned OAuth states", async () => {
+    oauthStates.set("abandoned-state", Date.now() - oauthLifetime - 1);
+    expect(oauthStates.has("abandoned-state")).toBe(true);
+    await Bun.sleep(10);
+    expect(oauthStates.has("abandoned-state")).toBe(false);
+  });
+
   test("logs out and expires the cookie", async () => {
     signIn();
     const response = await request("/api/auth/logout", true, "POST");

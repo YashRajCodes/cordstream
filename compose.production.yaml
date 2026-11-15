@@ -1,0 +1,17 @@
+services:
+  cordstream:
+    image: ghcr.io/yashrajcodes/cordstream:latest
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3001}
+      STREAM_DATABASE_PATH: /app/data/cordstream.sqlite
+    ports:
+      - "127.0.0.1:${PORT:-3001}:${PORT:-3001}"
+    volumes:
+      - cordstream-data:/app/data
+
+volumes:
+  cordstream-data:

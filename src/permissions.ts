@@ -1,3 +1,5 @@
+import type { DiscordApplication } from "./types";
+
 export function hasAdministratorPermission(guild: { owner?: boolean; permissions?: string }) {
   if (guild.owner) return true;
   try {
@@ -5,6 +7,17 @@ export function hasAdministratorPermission(guild: { owner?: boolean; permissions
   } catch {
     return false;
   }
+}
+
+export function hasApplicationAccess(application: DiscordApplication, userId: string, applicationId: string) {
+  if (application.id !== applicationId) return false;
+  if (application.owner?.id === userId) return true;
+  const team = application.team;
+  if (!team) return false;
+  if (team.owner_user_id === userId) return true;
+  return team.members?.some((member) => (
+    member.user?.id === userId && member.membership_state === 2
+  )) ?? false;
 }
 
 const permissionBits: Array<[string, bigint]> = [

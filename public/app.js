@@ -36,7 +36,7 @@ async function refreshSession() {
       state.selectedGuildId = null;
       state.selectedChannelId = null;
       const error = new URLSearchParams(window.location.search).get("auth_error");
-      renderLogin(error ? "Discord login failed. Try again." : "");
+      renderLogin(error === "private" ? "This instance is private." : error ? "Discord login failed. Try again." : "");
       return;
     }
     if (state.user?.id !== data.user.id) {

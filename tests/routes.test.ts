@@ -19,10 +19,10 @@ credentials.forEach((key, index) => {
 
 const cookie = "cordstream_session=test-session";
 
-function request(path: string, authenticated = false, method = "GET") {
+function request(path: string, authenticated = false, method = "GET", cookieHeader?: string) {
   return app.handle(new Request(`http://localhost${path}`, {
     method,
-    headers: authenticated ? { cookie } : {},
+    headers: authenticated || cookieHeader ? { cookie: cookieHeader ?? cookie } : {},
   }));
 }
 
@@ -42,6 +42,15 @@ beforeEach(() => {
 });
 
 afterEach(() => mock.restore());
+
+function withPrivateInstance<T>(callback: () => Promise<T>) {
+  const previous = Bun.env.PRIVATE;
+  Bun.env.PRIVATE = "1";
+  return callback().finally(() => {
+    if (previous === undefined) delete Bun.env.PRIVATE;
+    else Bun.env.PRIVATE = previous;
+  });
+}
 
 function mockFetch(implementation: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>) {
   return spyOn(globalThis, "fetch").mockImplementation(Object.assign(implementation, { preconnect: fetch.preconnect }));
@@ -134,6 +143,54 @@ describe("authentication routes", () => {
     expect((await request("/api/auth/status", true)).status).toBe(502);
     expect(sessions.has("test-session")).toBe(true);
   });
+
+  test("allows accepted application team members in private mode", () => withPrivateInstance(async () => {
+    const state = "private-team-state";
+    oauthStates.set(state, Date.now());
+    mockFetch(async (input) => {
+      const url = String(input);
+      if (url === `${discordApi}/oauth2/token`) return Response.json({ access_token: "user-token", expires_in: 3600 });
+      if (url === `${discordApi}/users/@me`) return Response.json({ id: "team-developer", username: "developer" });
+      if (url === `${discordApi}/applications/@me`) return Response.json({
+        id: clientId,
+        owner: { id: "application-owner" },
+        team: {
+          owner_user_id: "team-owner",
+          members: [{ user: { id: "team-developer" }, membership_state: 2 }],
+        },
+      });
+      if (url === `${discordApi}/users/@me/guilds`) return Response.json([]);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const response = await request(`/api/auth/callback?state=${state}&code=authorization-code`, false, "GET", `cordstream_oauth_state=${state}`);
+    expect(response.headers.get("location")).toBe(appUrl);
+    expect(response.headers.get("set-cookie")).toContain("cordstream_session=");
+    expect(sessions.size).toBe(1);
+    expect([...sessions.values()][0]?.user.id).toBe("team-developer");
+  }));
+
+  test("rejects users outside the application owner and team in private mode", () => withPrivateInstance(async () => {
+    const state = "private-outsider-state";
+    oauthStates.set(state, Date.now());
+    const fetchMock = mockFetch(async (input) => {
+      const url = String(input);
+      if (url === `${discordApi}/oauth2/token`) return Response.json({ access_token: "user-token", expires_in: 3600 });
+      if (url === `${discordApi}/users/@me`) return Response.json({ id: "outsider", username: "outsider" });
+      if (url === `${discordApi}/applications/@me`) return Response.json({
+        id: clientId,
+        owner: { id: "application-owner" },
+        team: { owner_user_id: "team-owner", members: [] },
+      });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const response = await request(`/api/auth/callback?state=${state}&code=authorization-code`, false, "GET", `cordstream_oauth_state=${state}`);
+    expect(response.headers.get("location")).toBe(`${appUrl}/?auth_error=private`);
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect(sessions.size).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  }));
 
   test("rejects invalid OAuth state and consumes it", async () => {
     oauthStates.set("test-state", Date.now());

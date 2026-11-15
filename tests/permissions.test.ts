@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasAdministratorPermission } from "../src/permissions";
+import { hasAdministratorPermission, hasApplicationAccess } from "../src/permissions";
 
 describe("hasAdministratorPermission", () => {
   test("allows server owners", () => {
@@ -18,5 +18,31 @@ describe("hasAdministratorPermission", () => {
 
   test("fails closed for malformed permissions", () => {
     expect(hasAdministratorPermission({ permissions: "invalid" })).toBe(false);
+  });
+});
+
+describe("hasApplicationAccess", () => {
+  const application = {
+    id: "application",
+    owner: { id: "owner" },
+    team: {
+      owner_user_id: "team-owner",
+      members: [
+        { user: { id: "developer" }, membership_state: 2 },
+        { user: { id: "invited" }, membership_state: 1 },
+      ],
+    },
+  };
+
+  test("allows the application owner and accepted team members", () => {
+    expect(hasApplicationAccess(application, "owner", "application")).toBe(true);
+    expect(hasApplicationAccess(application, "team-owner", "application")).toBe(true);
+    expect(hasApplicationAccess(application, "developer", "application")).toBe(true);
+  });
+
+  test("rejects users outside the application team", () => {
+    expect(hasApplicationAccess(application, "someone-else", "application")).toBe(false);
+    expect(hasApplicationAccess(application, "invited", "application")).toBe(false);
+    expect(hasApplicationAccess(application, "owner", "another-application")).toBe(false);
   });
 });

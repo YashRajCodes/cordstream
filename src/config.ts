@@ -6,6 +6,9 @@ export const clientId = Bun.env.DISCORD_CLIENT_ID;
 export const clientSecret = Bun.env.DISCORD_CLIENT_SECRET;
 export const botToken = Bun.env.DISCORD_BOT_TOKEN;
 export const streamDatabasePath = Bun.env.STREAM_DATABASE_PATH ?? "data/cordstream.sqlite";
+export function isPrivateInstance() {
+  return Boolean(Bun.env.PRIVATE);
+}
 export const production = Bun.env.NODE_ENV === "production";
 export const sessionLifetime = 7 * 24 * 60 * 60;
 export const oauthLifetime = 10 * 60 * 1000;

@@ -25,6 +25,7 @@ Set these environment variables for Discord:
 | `DISCORD_CLIENT_SECRET` | Discord OAuth client secret. |
 | `DISCORD_BOT_TOKEN` | Bot token used for message history and Gateway events. |
 | `STREAM_DATABASE_PATH` | SQLite file for stream links, default `./data/cordstream.sqlite`. Keep this file across deployments. |
+| `PRIVATE` | Set to a non-empty value such as `1` to allow login only to the Discord application owner and accepted team members. Private mode requires all Discord credentials, including the bot token for the same application. Stream URLs remain publicly readable by anyone with their key. |
 
 In the Discord Developer Portal, enable the bot's **Message Content Intent**. Discord must approve this intent for applications that require approval. cordstream requests the `GUILDS`, `GUILD_MESSAGES`, `GUILD_MESSAGE_REACTIONS`, and `MESSAGE_CONTENT` Gateway intents. Without message content access, Discord can omit content, embeds, attachments, and components.
 

@@ -15,6 +15,18 @@ export type Guild = {
 
 export type DiscordGuild = Omit<Guild, "botAdded"> & { owner?: boolean; permissions?: string };
 
+export type DiscordApplication = {
+  id: string;
+  owner?: { id: string };
+  team?: {
+    owner_user_id?: string;
+    members?: Array<{
+      membership_state?: number;
+      user?: { id: string };
+    }>;
+  } | null;
+};
+
 export type Session = {
   user: { id: string; username: string; global_name?: string | null; avatar?: string | null };
   accessToken?: string;

@@ -97,6 +97,15 @@ describe("loading states", () => {
     expect(page.app.innerHTML).not.toContain('class="loading-screen"');
   });
 
+  test("shows the private instance message after an unauthorized login", async () => {
+    const page = openApp(false, (url) => url === "/api/auth/status"
+      ? Response.json({ authenticated: false })
+      : undefined);
+    page.window.location.search = "?auth_error=private";
+    await page.settle();
+    expect(page.app.innerHTML).toContain("This instance is private.");
+  });
+
   test("shows channel placeholders while loading and ignores an older request for the same server", async () => {
     const page = openApp(true);
     await page.settle();

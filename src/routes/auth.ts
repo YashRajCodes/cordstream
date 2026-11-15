@@ -1,9 +1,20 @@
 import { Elysia } from "elysia";
-import { appUrl, clientId, clientSecret, oauthLifetime, production, redirectUri, sessionLifetime } from "../config";
+import {
+  appUrl,
+  botToken,
+  clientId,
+  clientSecret,
+  isPrivateInstance,
+  oauthLifetime,
+  production,
+  redirectUri,
+  sessionLifetime,
+} from "../config";
 import { discordJson, exchangeOAuthCode, guildsWithBotStatus, refreshGuildPermissions } from "../discord";
 import { apiError, redirect } from "../http";
+import { hasApplicationAccess } from "../permissions";
 import { cookieValue, expiredSessionCookie, getSession, oauthStates, sessionCookie, sessions } from "../session";
-import type { DiscordGuild, Session } from "../types";
+import type { DiscordApplication, DiscordGuild, Session } from "../types";
 
 export const authRoutes = new Elysia({ name: "auth" })
   .get("/api/auth/status", async ({ headers, set }) => {
@@ -25,6 +36,9 @@ export const authRoutes = new Elysia({ name: "auth" })
     }
   })
   .get("/api/auth/login", ({ headers }) => {
+    if (isPrivateInstance() && (!clientId || !clientSecret || !botToken)) {
+      return apiError("Private login is not configured.", 503);
+    }
     if (!clientId || !clientSecret) {
       if (production) return apiError("Discord login is not configured.", 503);
       const id = crypto.randomUUID();
@@ -78,10 +92,14 @@ export const authRoutes = new Elysia({ name: "auth" })
 
     try {
       const token = await exchangeOAuthCode(query.code);
-      const [user, guilds] = await Promise.all([
-        discordJson<Session["user"]>("/users/@me", token.access_token, "Bearer"),
-        discordJson<DiscordGuild[]>("/users/@me/guilds", token.access_token, "Bearer"),
-      ]);
+      const user = await discordJson<Session["user"]>("/users/@me", token.access_token, "Bearer");
+      if (isPrivateInstance()) {
+        const application = await discordJson<DiscordApplication>("/applications/@me", botToken!, "Bot");
+        if (!hasApplicationAccess(application, user.id, clientId!)) {
+          return redirect(`${appUrl}/?auth_error=private`, expiredSessionCookie());
+        }
+      }
+      const guilds = await discordJson<DiscordGuild[]>("/users/@me/guilds", token.access_token, "Bearer");
       const id = crypto.randomUUID();
       sessions.set(id, {
         user,

@@ -1,0 +1,81 @@
+.empty-state {
+  display: grid;
+  min-height: 100%;
+  flex: 1;
+  place-items: center;
+  padding: 28px;
+  color: #7e7e7e;
+  font-size: 13px;
+  text-align: center;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+.empty-title {
+  color: #f0f0f0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.bot-state {
+  display: flex;
+  width: min(480px, calc(100% - 48px));
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.bot-state p {
+  margin: 0;
+  color: #a8a8a8;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.invite-button {
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #3d3d3d;
+  border-radius: 7px;
+  background: #1c1c1c;
+  color: #dcdcdc;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.invite-button:hover {
+  border-color: #6b6b6b;
+  background: #242424;
+}
+
+#toast {
+  position: fixed;
+  z-index: 10;
+  right: 20px;
+  bottom: 20px;
+  max-width: calc(100vw - 40px);
+  padding: 10px 13px;
+  border: 1px solid #505050;
+  border-radius: 6px;
+  background: #1d1d1d;
+  color: #e6e6e6;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(5px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+#toast[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.icon-muted {
+  color: var(--quiet);
+}
+

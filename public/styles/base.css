@@ -1,0 +1,111 @@
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/outfit-1.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/outfit-2.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/outfit-3.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/outfit-4.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans Code";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/google-sans-code-1.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans Code";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/google-sans-code-2.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Google Sans Code";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/google-sans-code-3.ttf") format("truetype");
+}
+
+:root {
+  color-scheme: dark;
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --black: #090909;
+  --panel: #0e0e0e;
+  --panel-raised: #141414;
+  --line: #222222;
+  --line-strong: #343434;
+  --text: #f2f2f2;
+  --muted: #929292;
+  --quiet: #666666;
+  --green: #a6a6a6;
+  --green-dark: #272727;
+  --discord: #a5a5a5;
+  --coral: #b6b6b6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-width: 320px;
+  min-height: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+

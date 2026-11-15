@@ -1,7 +1,7 @@
-import { botToken, clientId, clientSecret, discordApi, redirectUri } from "./config";
+import { botToken, clientId, clientSecret, discordApi, permissionCacheLifetime, redirectUri } from "./config";
 import { demoGuilds } from "./demo";
 import { hasAdministratorPermission } from "./permissions";
-import type { Guild, Session } from "./types";
+import type { DiscordGuild, Guild, Session } from "./types";
 
 export async function exchangeOAuthCode(code: string) {
   const response = await fetch(`${discordApi}/oauth2/token`, {
@@ -22,6 +22,7 @@ export async function exchangeOAuthCode(code: string) {
 export async function discordJson<T>(path: string, token: string, kind: "Bot" | "Bearer" = "Bot"): Promise<T> {
   const response = await fetch(`${discordApi}${path}`, {
     headers: { Authorization: `${kind} ${token}` },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`Discord API returned ${response.status}`);
   return response.json() as Promise<T>;
@@ -52,11 +53,39 @@ export async function validAccessToken(session: Session) {
   }
 }
 
+const permissionRequests = new WeakMap<Session, Promise<DiscordGuild[] | undefined>>();
+
+/** Recheck each action, but share a successful Discord permission result for at most one minute. */
+export async function refreshGuildPermissions(session: Session, force = false): Promise<DiscordGuild[] | undefined> {
+  const age = Date.now() - (session.guildsCheckedAt ?? 0);
+  if (!force && session.guilds && session.guildsCheckedAt !== undefined && age >= 0 && age < permissionCacheLifetime) {
+    return session.guilds;
+  }
+  const pending = permissionRequests.get(session);
+  if (pending) return pending;
+  const request = (async () => {
+    const token = await validAccessToken(session);
+    if (!token) return undefined;
+    const guilds = await discordJson<DiscordGuild[]>("/users/@me/guilds", token, "Bearer");
+    session.guilds = guilds;
+    session.guildsCheckedAt = Date.now();
+    return guilds;
+  })();
+  permissionRequests.set(session, request);
+  try {
+    return await request;
+  } finally {
+    permissionRequests.delete(session);
+  }
+}
+
 export async function guildsWithBotStatus(session: Session, refresh = false): Promise<Guild[]> {
   if (session.demo) return demoGuilds;
   const guilds = (session.guilds ?? []).filter(hasAdministratorPermission);
   const cached = session.botStatus;
-  if (!refresh && cached && Date.now() - (session.botStatusCheckedAt ?? 0) < 60_000) {
+  const checkedAt = Date.now();
+  const age = checkedAt - (session.botStatusCheckedAt ?? 0);
+  if (!refresh && cached && age >= 0 && age < permissionCacheLifetime) {
     return guilds.map((guild) => ({ ...guild, botAdded: cached.get(guild.id) ?? false }));
   }
 
@@ -77,6 +106,6 @@ export async function guildsWithBotStatus(session: Session, refresh = false): Pr
     }
   }
   session.botStatus = status;
-  session.botStatusCheckedAt = Date.now();
+  session.botStatusCheckedAt = checkedAt;
   return guilds.map((guild) => ({ ...guild, botAdded: status.get(guild.id) ?? false }));
 }

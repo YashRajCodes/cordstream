@@ -1,18 +1,19 @@
 import { Elysia } from "elysia";
+import { requireGuildAccess } from "../access";
 import { botToken, clientId, redirectUri } from "../config";
 import { demoChannelsFor, demoGuilds, demoRoles } from "../demo";
 import { discordJson, guildsWithBotStatus, validAccessToken } from "../discord";
 import { apiError } from "../http";
-import { hasAdministratorPermission, namesForPermissions } from "../permissions";
-import { getSession } from "../session";
+import { namesForPermissions } from "../permissions";
 import type { DiscordChannel } from "../types";
 
 export const guildRoutes = new Elysia({ name: "guilds" })
-  .get("/api/guilds/:id/channels", async ({ params, headers }) => {
-    const session = getSession(headers.cookie);
-    if (!session) return apiError("Not signed in.", 401);
+  .get("/api/guilds/:guildId/channels", async ({ params, headers, set }) => {
+    set.headers["Cache-Control"] = "no-store";
+    const session = await requireGuildAccess(headers.cookie, params.guildId);
+    if (session instanceof Response) return session;
     if (session.demo) {
-      const guild = demoGuilds.find((item) => item.id === params.id);
+      const guild = demoGuilds.find((item) => item.id === params.guildId);
       if (!guild) return apiError("Server not found.", 404);
       if (!guild.botAdded) return { botAdded: false, channels: [], roles: [] };
       return {
@@ -22,10 +23,9 @@ export const guildRoutes = new Elysia({ name: "guilds" })
       };
     }
 
-    const guild = session.guilds?.find((item) => item.id === params.id && hasAdministratorPermission(item));
-    if (!guild) return apiError("Server not found.", 404);
+    const guild = session.guilds!.find((item) => item.id === params.guildId)!;
     const guildStatus = await guildsWithBotStatus(session);
-    const available = guildStatus.find((item) => item.id === params.id)?.botAdded ?? false;
+    const available = guildStatus.find((item) => item.id === params.guildId)?.botAdded ?? false;
     if (!available || !botToken) return { botAdded: false, channels: [], roles: [] };
 
     try {
@@ -47,13 +47,10 @@ export const guildRoutes = new Elysia({ name: "guilds" })
       return apiError("Could not load this server.", 502);
     }
   })
-  .get("/api/guilds/:id/invite", ({ params, headers, set }) => {
+  .get("/api/guilds/:guildId/invite", async ({ params, headers, set }) => {
     set.headers["Cache-Control"] = "no-store";
-    const session = getSession(headers.cookie);
-    if (!session) return apiError("Not signed in.", 401);
-    const isDemo = session.demo && demoGuilds.some((guild) => guild.id === params.id);
-    const isMember = session.guilds?.some((guild) => guild.id === params.id && hasAdministratorPermission(guild));
-    if (!isDemo && !isMember) return apiError("Server not found.", 404);
+    const session = await requireGuildAccess(headers.cookie, params.guildId);
+    if (session instanceof Response) return session;
     if (!clientId || session.demo) return { url: null };
     const state = crypto.randomUUID();
     session.botInvite = { state, issuedAt: Date.now() };
@@ -64,8 +61,8 @@ export const guildRoutes = new Elysia({ name: "guilds" })
       response_type: "code",
       state,
       scope: "bot applications.commands",
-      permissions: "1024",
-      guild_id: params.id,
+      permissions: "66560",
+      guild_id: params.guildId,
       disable_guild_select: "false",
     }).toString();
     return { url: invite.toString() };

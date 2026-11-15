@@ -2,6 +2,13 @@ import { selectedGuild, state } from "./state.js";
 import { app, escapeHtml } from "./ui.js";
 import { renderChannelsPanel, renderServerRail } from "./views/navigation.js";
 import { renderMainPanel } from "./views/streams.js";
+import { loadingStatus } from "./loading.js";
+
+export function renderLoading() {
+  app.innerHTML = `<section class="loading-screen" aria-busy="true"><div class="loading-card">
+    <span class="loading-brand">cordstream</span>${loadingStatus("Loading your servers")}
+  </div></section>`;
+}
 
 export function renderLogin(error = "") {
   const message = error ? `<p class="login-error">${escapeHtml(error)}</p>` : "";

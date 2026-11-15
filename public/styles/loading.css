@@ -1,0 +1,166 @@
+.loading-screen {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px;
+  background: #0a0a0a;
+}
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.loading-brand {
+  color: #e6e6e6;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+
+.loading-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #929292;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid #3a3a3a;
+  border-top-color: #c0c0c0;
+  border-radius: 50%;
+  animation: loading-spin .8s linear infinite;
+}
+
+.create-button .loading-spinner,
+.delete-button .loading-spinner {
+  border-top-color: currentColor;
+}
+
+.server-rail-footer {
+  position: relative;
+}
+
+.server-refresh {
+  position: absolute;
+  z-index: 1;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.server-refresh .loading-spinner {
+  width: 12px;
+  height: 12px;
+  flex-basis: 12px;
+}
+
+.skeleton {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: linear-gradient(100deg, #1c1c1c 20%, #272727 45%, #1c1c1c 70%);
+  background-size: 220% 100%;
+  animation: loading-shimmer 1.8s ease-in-out infinite;
+}
+
+.channel-skeleton {
+  padding: 10px 9px;
+}
+
+.channel-skeleton-heading {
+  width: 45%;
+  height: 9px;
+  margin: 11px 0 13px;
+}
+
+.channel-skeleton-row {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  gap: 10px;
+}
+
+.channel-skeleton-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.channel-skeleton-line {
+  max-width: calc(100% - 23px);
+  height: 10px;
+}
+
+.stream-loading > .loading-status {
+  margin-bottom: 14px;
+}
+
+.stream-skeleton-row {
+  pointer-events: none;
+}
+
+.stream-skeleton-icon {
+  width: 29px;
+  height: 29px;
+}
+
+.stream-skeleton-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stream-skeleton-line {
+  height: 10px;
+}
+
+.stream-skeleton-date {
+  width: 76px;
+  height: 7px;
+}
+
+.stream-skeleton-button {
+  width: 22px;
+  height: 22px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loading-shimmer {
+  to { background-position: -220% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner,
+  .skeleton {
+    animation: none;
+  }
+}

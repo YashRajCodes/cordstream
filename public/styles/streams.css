@@ -173,6 +173,28 @@
   color: #f2f2f2;
 }
 
+.delete-button:hover:not(:disabled) {
+  border-color: #713c3c;
+  color: #ef9898;
+}
+
+.create-button:disabled,
+.copy-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.stream-retry {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #cdcdcd;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
 .stream-empty {
   padding: 25px 0;
   color: #7c7c7c;

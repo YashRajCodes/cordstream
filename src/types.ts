@@ -22,6 +22,7 @@ export type Session = {
   accessTokenExpiresAt?: number;
   demo?: boolean;
   guilds?: DiscordGuild[];
+  guildsCheckedAt?: number;
   botStatus?: Map<string, boolean>;
   botStatusCheckedAt?: number;
   botInvite?: { state: string; issuedAt: number };

@@ -1,5 +1,6 @@
 import { selectedGuild, sortedGuilds, state } from "../state.js";
 import { escapeHtml, icons, shortName } from "../ui.js";
+import { channelSkeleton, loadingSpinner } from "../loading.js";
 
 function guildIcon(guild) {
   if (guild.icon) {
@@ -22,7 +23,7 @@ export function renderServerRail() {
       <span class="server-icon-wrap"><span class="server-icon">${guildIcon(guild)}</span></span>
       <span class="server-name">${escapeHtml(guild.name)}</span>
     </button>`).join("")}
-  </div><div class="server-rail-footer"><details class="user-menu">
+  </div><div class="server-rail-footer">${state.sessionRefreshing ? `<span class="server-refresh" role="status" title="Refreshing servers">${loadingSpinner}<span class="visually-hidden">Refreshing servers</span></span>` : ""}<details class="user-menu">
     <summary class="user-menu-trigger" aria-label="Open account menu" title="Open account menu">${userAvatar()}</summary>
     <div class="user-menu-popover"><button class="user-menu-logout" type="button" data-action="logout">${icons.logout}<span>Log out</span></button></div>
   </details></div></nav>`;
@@ -44,7 +45,7 @@ function channelButton(channel) {
 }
 
 function renderChannelContents() {
-  if (state.channelsLoading) return `<div class="empty-state"><p>Loading channels</p></div>`;
+  if (state.channelsLoading) return channelSkeleton();
   if (state.channelsError) return `<div class="empty-state"><p>Couldn't load channels</p></div>`;
   if (!state.channels.length) return `<div class="empty-state"><p>No channels</p></div>`;
 
@@ -71,7 +72,7 @@ function renderChannelContents() {
 export function renderChannelsPanel() {
   const guild = selectedGuild();
   if (!guild?.botAdded) return "";
-  return `<aside class="channels-panel">
+  return `<aside class="channels-panel" aria-label="Channels" aria-busy="${state.channelsLoading}">
     <div class="channels-scroll">${guild.botAdded ? renderChannelContents() : ""}</div>
   </aside>`;
 }

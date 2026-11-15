@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { appUrl, clientId, clientSecret, oauthLifetime, production, redirectUri, sessionLifetime } from "../config";
-import { discordJson, exchangeOAuthCode, guildsWithBotStatus, validAccessToken } from "../discord";
+import { discordJson, exchangeOAuthCode, guildsWithBotStatus, refreshGuildPermissions } from "../discord";
 import { apiError, redirect } from "../http";
 import { cookieValue, expiredSessionCookie, getSession, oauthStates, sessionCookie, sessions } from "../session";
 import type { DiscordGuild, Session } from "../types";
@@ -12,9 +12,7 @@ export const authRoutes = new Elysia({ name: "auth" })
     if (!session) return { authenticated: false, demoAvailable: !production };
     try {
       if (!session.demo) {
-        const token = await validAccessToken(session);
-        if (!token) return apiError("Discord login expired. Sign in again.", 401);
-        session.guilds = await discordJson<DiscordGuild[]>("/users/@me/guilds", token, "Bearer");
+        if (!await refreshGuildPermissions(session, true)) return apiError("Discord login expired. Sign in again.", 401);
       }
       return {
         authenticated: true,
@@ -91,6 +89,7 @@ export const authRoutes = new Elysia({ name: "auth" })
         refreshToken: token.refresh_token,
         accessTokenExpiresAt: Date.now() + token.expires_in * 1000,
         guilds,
+        guildsCheckedAt: Date.now(),
         expiresAt: Date.now() + sessionLifetime * 1000,
       });
       const stateCookie = `cordstream_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${production ? "; Secure" : ""}`;

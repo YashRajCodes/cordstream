@@ -1,9 +1,15 @@
 import { renderLogin, renderShell } from "./render.js";
 import { selectedGuild, state } from "./state.js";
-import { readStreams, writeStreams } from "./streams.js";
+import { createStream, deleteStream, loadStreams, resetStreams } from "./streams.js";
 import { copyUrl, showToast } from "./ui.js";
 
+let channelRequestVersion = 0;
+
 export async function selectGuild(id) {
+  const version = ++channelRequestVersion;
+  const userId = state.user?.id;
+  const isCurrent = () => version === channelRequestVersion && state.selectedGuildId === id && state.user?.id === userId;
+  resetStreams();
   state.selectedGuildId = id;
   state.selectedChannelId = null;
   state.channels = [];
@@ -23,33 +29,37 @@ export async function selectGuild(id) {
     const response = await fetch(`/api/guilds/${encodeURIComponent(id)}/channels`);
     if (!response.ok) throw new Error("Channel request failed");
     const data = await response.json();
-    if (state.selectedGuildId !== id) return;
+    if (!isCurrent()) return;
     state.channels = data.channels ?? [];
     state.roles = data.roles ?? [];
     for (const category of state.channels.filter((channel) => channel.type === 4)) state.openCategories.add(category.id);
   } catch {
-    if (state.selectedGuildId !== id) return;
+    if (!isCurrent()) return;
     state.channelsError = true;
   }
   state.channelsLoading = false;
   renderShell();
 }
 
-function makeStreamUrl() {
-  const token = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
-  const links = readStreams();
-  links.push({ id: token, url: `${window.location.origin}/s/${token}`, createdAt: Date.now() });
-  writeStreams(links);
+async function updateStreams(operation) {
+  const pending = operation();
   renderShell();
-  showToast("Stream URL created");
+  const message = await pending;
+  if (!state.user) return;
+  renderShell();
+  if (message) showToast(message);
 }
 
 export async function handleAction(action, id, element) {
   if (action === "select-guild") return selectGuild(id);
   if (action === "select-channel") {
+    resetStreams();
     state.selectedChannelId = id;
     state.mobileView = "stream";
+    const pending = loadStreams();
     renderShell();
+    await pending;
+    if (state.user && state.selectedChannelId === id) renderShell();
     return;
   }
   if (action === "toggle-category") {
@@ -57,14 +67,13 @@ export async function handleAction(action, id, element) {
     renderShell();
     return;
   }
-  if (action === "create-stream") return makeStreamUrl();
+  if (action === "create-stream") return updateStreams(createStream);
+  if (action === "delete-stream") return updateStreams(() => deleteStream(id));
+  if (action === "retry-streams") return updateStreams(loadStreams);
   if (action === "copy-stream") return copyUrl(element.dataset.url);
-  if (action === "stream-link") {
-    showToast("Stream playback is not connected yet");
-    return;
-  }
   if (action === "logout") {
     await fetch("/api/auth/logout", { method: "POST" });
+    resetStreams();
     state.user = null;
     state.guilds = [];
     state.selectedGuildId = null;

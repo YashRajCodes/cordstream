@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hasAdministratorPermission } from "./permissions";
+import { hasAdministratorPermission } from "../src/permissions";
 
 describe("hasAdministratorPermission", () => {
   test("allows server owners", () => {

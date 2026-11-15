@@ -9,7 +9,12 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main id="app" aria-live="polite"></main>
+    <main id="app" aria-live="polite">
+      <section class="loading-screen" aria-busy="true"><div class="loading-card">
+        <span class="loading-brand">cordstream</span>
+        <span class="loading-status" role="status"><span class="loading-spinner" aria-hidden="true"></span><span>Loading your servers</span></span>
+      </div></section>
+    </main>
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/app.js"></script>
   </body>

@@ -1,4 +1,4 @@
-# cordstream
+# <img src="public/brand/cordstream-lockup.svg" alt="cordstream" width="480" />
 
 cordstream creates public Server-Sent Events streams for Discord channels. Each connection starts with the latest 50 messages, then receives live message, edit, deletion, and reaction events.
 

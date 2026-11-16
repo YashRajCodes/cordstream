@@ -8,16 +8,17 @@
 
 .loading-card {
   display: flex;
+  width: 100%;
+  max-width: 360px;
   align-items: center;
   flex-direction: column;
   gap: 20px;
 }
 
 .loading-brand {
-  color: #e6e6e6;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -.04em;
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .loading-status {

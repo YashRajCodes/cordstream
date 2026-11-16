@@ -6,7 +6,7 @@ import { loadingStatus } from "./loading.js";
 
 export function renderLoading() {
   app.innerHTML = `<section class="loading-screen" aria-busy="true"><div class="loading-card">
-    <span class="loading-brand">cordstream</span>${loadingStatus("Loading your servers")}
+    <img class="loading-brand" src="/brand/cordstream-lockup.svg" alt="cordstream" width="1610" height="260" />${loadingStatus("Loading your servers")}
   </div></section>`;
 }
 
